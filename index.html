@@ -1,39 +1,45 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Connect Phantom (Intent)</title>
   <style>
-    body{margin:0;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0e0e0e;color:#fff;font-family:sans-serif}
-    button{background:#9945ff;color:#fff;border:none;padding:14px 28px;font-size:1.2rem;border-radius:8px;cursor:pointer}
-    #addr{margin-top:1rem;font-size:1rem;color:#00ffa3;word-break:break-all}
+    html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}
+    #btn{background:#9945ff;color:#fff;border:none;padding:14px 28px;font-size:1.2rem;border-radius:8px;cursor:pointer}
+    #addr{margin-top:20px;font-size:1rem;color:#00ffa3;word-break:break-all}
   </style>
 </head>
 <body>
-  <button id="btn">Connect Wallet</button>
-  <div id="addr"></div>
+  <div>
+    <button id="btn">Connect Wallet</button>
+    <div id="addr"></div>
+  </div>
 
-  <!-- 1. load MWA bundle -->
-  <script type="module">
-    import { transact } from 'https://unpkg.com/@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.0/dist/index.browser.esm.js';
+  <script>
+    /* ---------- helpers ---------- */
+    const params = new URLSearchParams(location.hash.slice(1));
+    const addrEl = document.getElementById('addr');
 
-    const btn  = document.getElementById('btn');
-    const addr = document.getElementById('addr');
+    // If we returned from Phantom, show the address
+    if (params.has('address')) {
+      addrEl.textContent = `Connected: ${params.get('address')}`;
+    }
 
-    btn.addEventListener('click', async () => {
-      try {
-        const pubkey = await transact(async wallet => {
-          const { accounts } = await wallet.authorize({
-            cluster: 'mainnet-beta',
-            identity: { name: 'GitHub Pages Demo' }
-          });
-          return accounts[0].address;
-        });
-        addr.textContent = `Connected: ${pubkey}`;
-      } catch (e) {
-        addr.textContent = e.message || 'Cancelled / failed';
-      }
+    // Build the intent that Phantom understands
+    function buildIntent() {
+      const callbackUrl = encodeURIComponent(location.href.split('#')[0]);
+      return `intent://authorize/?cluster=mainnet-beta&callback_url=${callbackUrl}#Intent;scheme=solana-wallet;package=app.phantom;end;`;
+    }
+
+    document.getElementById('btn').addEventListener('click', () => {
+      // iOS universal link
+      const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const url = iOS
+        ? `https://phantom.app/ul/authorize/${encodeURIComponent(location.href.split('#')[0])}?cluster=mainnet-beta`
+        : buildIntent();
+
+      location.href = url;
     });
   </script>
 </body>
