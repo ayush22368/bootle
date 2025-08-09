@@ -3,48 +3,65 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Connect Phantom (in-app browser)</title>
+  <title>Open in Phantom</title>
   <style>
     html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}
-    button{background:#9945ff;color:#fff;border:none;padding:14px 28px;font-size:1.2rem;border-radius:8px;cursor:pointer}
+    #openBtn{background:#9945ff;color:#fff;border:none;padding:16px 32px;font-size:1.2rem;border-radius:8px;cursor:pointer;margin-bottom:24px}
+    #connectBtn{background:#00ffa3;color:#000;border:none;padding:14px 28px;font-size:1.1rem;border-radius:8px;display:none}
     #addr{margin-top:20px;font-size:1rem;color:#00ffa3;word-break:break-all}
   </style>
 </head>
 <body>
-  <button id="btn">Connect Wallet</button>
-  <div id="addr"></div>
+  <div id="wrapper">
+    <button id="openBtn">Open in Phantom</button>
+    <button id="connectBtn">Connect Wallet</button>
+    <div id="addr"></div>
+  </div>
 
   <script type="module">
-    // 1. official Mobile-Wallet-Adapter bundle
-    import { transact } from 'https://unpkg.com/@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.0/dist/index.browser.esm.js';
+    /* ---------- helpers ---------- */
+    const ua = navigator.userAgent || '';
+    const inPhantom = /Phantom/i.test(ua) && /Mobile/i.test(ua);
 
-    const btn  = document.getElementById('btn');
-    const addr = document.getElementById('addr');
+    const openBtn   = document.getElementById('openBtn');
+    const connectBtn= document.getElementById('connectBtn');
+    const addr      = document.getElementById('addr');
 
-    btn.addEventListener('click', async () => {
-      try {
-        const pubkey = await transact(async wallet => {
-          // this fires the native Phantom prompt
-          const { accounts } = await wallet.authorize({
-            cluster: 'mainnet-beta',
-            identity: { name: 'Demo dApp' }
-          });
-          return accounts[0].address;
+    /* 1. not inside Phantom → show “Open in Phantom” button */
+    if (!inPhantom) {
+      const intent = `intent://${location.host}${location.pathname}#Intent;scheme=https;package=app.phantom;end;`;
+      const iosUrl = `https://phantom.app/ul/browser/${encodeURIComponent(location.href)}`;
+
+      openBtn.style.display = 'inline-block';
+      openBtn.onclick = () => {
+        location.href = /iPhone|iPad|iPod/.test(ua) ? iosUrl : intent;
+      };
+    } else {
+      /* 2. we are inside Phantom → show the real wallet button */
+      openBtn.style.display = 'none';
+      connectBtn.style.display = 'inline-block';
+
+      import('https://unpkg.com/@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.0/dist/index.browser.esm.js')
+        .then(({ transact }) => {
+          connectBtn.onclick = async () => {
+            try {
+              const pk = await transact(async wallet => {
+                const { accounts } = await wallet.authorize({ cluster: 'mainnet-beta' });
+                return accounts[0].address;
+              });
+              addr.textContent = `Connected: ${pk}`;
+            } catch (e) {
+              addr.textContent = e.message || 'Cancelled';
+            }
+          };
+
+          // auto-restore
+          transact(async wallet => {
+            const { accounts } = await wallet.authorize({ onlyIfTrusted: true, cluster: 'mainnet-beta' });
+            if (accounts[0]) addr.textContent = `Connected: ${accounts[0].address}`;
+          }).catch(()=>{});
         });
-        addr.textContent = `Connected: ${pubkey}`;
-      } catch (e) {
-        addr.textContent = e.message || 'Cancelled';
-      }
-    });
-
-    // auto-restore if already authorised
-    try {
-      const pk = await transact(async wallet => {
-        const { accounts } = await wallet.authorize({ onlyIfTrusted: true, cluster: 'mainnet-beta' });
-        return accounts[0]?.address;
-      });
-      if (pk) addr.textContent = `Connected: ${pk}`;
-    } catch {}
+    }
   </script>
 </body>
 </html>
