@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Connect Phantom (Mobile Deep-Link)</title>
+  <style>
+    html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}
+    #connectBtn{background:#9945ff;color:#fff;border:none;padding:14px 28px;font-size:1.1rem;border-radius:8px;cursor:pointer}
+    #address{margin-top:20px;font-size:1rem;color:#00ffa3;word-break:break-all}
+  </style>
+</head>
+<body>
+  <div>
+    <button id="connectBtn">Connect Wallet</button>
+    <div id="address"></div>
+  </div>
+
+  <script type="module">
+    import { transact } from 'https://unpkg.com/@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.0/dist/index.browser.esm.js';
+
+    const btn   = document.getElementById('connectBtn');
+    const addr  = document.getElementById('address');
+
+    btn.addEventListener('click', async () => {
+      try {
+        const result = await transact(async wallet => {
+          const { accounts } = await wallet.authorize({ cluster: 'mainnet-beta' });
+          return accounts[0].address;
+        });
+        addr.textContent = `Connected: ${result}`;
+      } catch (e) {
+        console.error(e);
+        addr.textContent = e.message || 'Connection cancelled / failed';
+      }
+    });
+
+    // Optional: auto-restore
+    try {
+      const result = await transact(async wallet => {
+        const { accounts } = await wallet.authorize({ cluster: 'mainnet-beta', identity: { name: 'My dApp' }, auth_token: null });
+        if (accounts.length) addr.textContent = `Connected: ${accounts[0].address}`;
+      });
+    } catch {}
+  </script>
+</body>
+</html>
