@@ -1,47 +1,30 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Connect Phantom (in-app)</title>
-  <style>
-    html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}
-    button{background:#9945ff;color:#fff;border:none;padding:14px 28px;font-size:1.2rem;border-radius:8px;cursor:pointer}
-    #addr{margin-top:20px;font-size:1rem;color:#00ffa3;word-break:break-all}
-  </style>
+  <meta charset="UTF-8">
+  <title>Phantom Mobile Connect</title>
 </head>
 <body>
-  <div>
-    <button id="btn">Connect Wallet</button>
-    <div id="addr"></div>
-  </div>
+  <h2>Phantom Mobile Connect</h2>
+  <button id="connectBtn">Connect Wallet</button>
+  <p id="status">Not connected</p>
 
-  <script type="module">
-    import { transact } from 'https://unpkg.com/@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.0/dist/index.browser.esm.js';
+  <script>
+    const status = document.getElementById("status");
+    const btn = document.getElementById("connectBtn");
 
-    const btn  = document.getElementById('btn');
-    const addr = document.getElementById('addr');
+    // 1. On page load, check if Phantom returned with address in URL
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("wallet")) {
+      status.textContent = "Connected: " + params.get("wallet");
+    }
 
-    btn.addEventListener('click', async () => {
-      try {
-        const pk = await transact(async wallet => {
-          const { accounts } = await wallet.authorize({ cluster: 'mainnet-beta' });
-          return accounts[0].address;
-        });
-        addr.textContent = `Connected: ${pk}`;
-      } catch (e) {
-        addr.textContent = e.message || 'Cancelled';
-      }
+    // 2. On click, open Phantom deep link
+    btn.addEventListener("click", () => {
+      const mySite = encodeURIComponent(window.location.origin + window.location.pathname);
+      // This is a mock — in real MWA, you'd do encryption, but for demo:
+      window.location.href = `https://phantom.app/ul/v1/connect?app_url=${mySite}&redirect_link=${mySite}&cluster=mainnet-beta`;
     });
-
-    // auto-restore if already authorised
-    try {
-      const pk = await transact(async wallet => {
-        const { accounts } = await wallet.authorize({ onlyIfTrusted: true, cluster: 'mainnet-beta' });
-        return accounts[0]?.address;
-      });
-      if (pk) addr.textContent = `Connected: ${pk}`;
-    } catch {}
   </script>
 </body>
 </html>
