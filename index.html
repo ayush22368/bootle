@@ -3,65 +3,42 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Phantom – Custom-Tab flow</title>
+  <title>Force Phantom In-App Browser</title>
   <style>
-    html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-    #cta{background:#9945ff;color:#fff;border:none;padding:16px 32px;font-size:1.2rem;border-radius:8px;cursor:pointer;margin-bottom:24px}
-    #connectBtn{background:#00ffa3;color:#000;border:none;padding:14px 28px;font-size:1.1rem;border-radius:8px;display:none}
+    html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}
+    button{background:#9945ff;color:#fff;border:none;padding:16px 32px;font-size:1.2rem;border-radius:8px;cursor:pointer;margin-bottom:24px}
     #addr{margin-top:20px;font-size:1rem;color:#00ffa3;word-break:break-all}
   </style>
 </head>
 <body>
-  <!-- STEP 1: open inside Custom-Tab -->
-  <button id="cta">Open in Phantom</button>
-
-  <!-- STEP 2: real wallet button once inside Custom-Tab -->
-  <button id="connectBtn">Connect Wallet</button>
+  <button id="btn">Connect Wallet</button>
   <div id="addr"></div>
 
   <script type="module">
-    /* ---------- Detect if we are inside a Custom-Tab ---------- */
-    const ua = navigator.userAgent || '';
-    const inCT = /wv|Mobile.*Chrome/i.test(ua);
+    /* 1️⃣  Detect if we’re inside Phantom’s tab */
+    const inPhantom = /Phantom/i.test(navigator.userAgent);
 
-    const ctaBtn   = document.getElementById('cta');
-    const connBtn  = document.getElementById('connectBtn');
-    const addrEl   = document.getElementById('addr');
+    /* 2️⃣  If not, redirect into Phantom’s browser tab */
+    if (!inPhantom) {
+      const target = encodeURIComponent(location.href);
+      const iosUrl = `https://phantom.app/ul/browser/${target}`;
+      const androidUrl = `https://phantom.app/ul/browser/${target}`;
+      location.href = /iPhone|iPad|iPod/.test(navigator.userAgent) ? iosUrl : androidUrl;
+    }
 
-    /* ---------- STEP 1: external browser → launch Custom-Tab ---------- */
-    if (!inCT) {
-      const url = new URL(location.href);
-      url.searchParams.set('ct', '1'); // flag so we know we’re back
-      const callback = encodeURIComponent(url.toString());
-
-      const androidIntent =
-        `intent://authorize/` +
-        `?cluster=mainnet-beta` +
-        `&callback_url=${callback}` +
-        `#Intent;scheme=solana-wallet;package=app.phantom;S.browser_fallback_url=${encodeURIComponent(location.href)};end;`;
-
-      const iosUniversal = `https://phantom.app/ul/authorize/${callback}?cluster=mainnet-beta`;
-
-      ctaBtn.onclick = () => {
-        location.href = /iPhone|iPad|iPod/.test(ua) ? iosUniversal : androidIntent;
-      };
-    } else {
-      /* ---------- STEP 2: inside Custom-Tab → show real button ---------- */
-      ctaBtn.style.display = 'none';
-      connBtn.style.display = 'inline-block';
-
-      /* import adapter */
+    /* 3️⃣  Now we are inside Phantom → run the adapter */
+    else {
       import('https://unpkg.com/@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.0/dist/index.browser.esm.js')
         .then(({ transact }) => {
-          connBtn.onclick = async () => {
+          document.getElementById('btn').onclick = async () => {
             try {
               const pk = await transact(async wallet => {
                 const { accounts } = await wallet.authorize({ cluster: 'mainnet-beta' });
                 return accounts[0].address;
               });
-              addrEl.textContent = `Connected: ${pk}`;
+              document.getElementById('addr').textContent = `Connected: ${pk}`;
             } catch (e) {
-              addrEl.textContent = e.message || 'Cancelled';
+              document.getElementById('addr').textContent = e.message || 'Cancelled';
             }
           };
         });
