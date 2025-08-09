@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Connect Phantom (Intent)</title>
+  <title>Connect Phantom (in-app)</title>
   <style>
-    html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}
-    #btn{background:#9945ff;color:#fff;border:none;padding:14px 28px;font-size:1.2rem;border-radius:8px;cursor:pointer}
+    html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}
+    button{background:#9945ff;color:#fff;border:none;padding:14px 28px;font-size:1.2rem;border-radius:8px;cursor:pointer}
     #addr{margin-top:20px;font-size:1rem;color:#00ffa3;word-break:break-all}
   </style>
 </head>
@@ -16,31 +16,32 @@
     <div id="addr"></div>
   </div>
 
-  <script>
-    /* ---------- helpers ---------- */
-    const params = new URLSearchParams(location.hash.slice(1));
-    const addrEl = document.getElementById('addr');
+  <script type="module">
+    import { transact } from 'https://unpkg.com/@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.0/dist/index.browser.esm.js';
 
-    // If we returned from Phantom, show the address
-    if (params.has('address')) {
-      addrEl.textContent = `Connected: ${params.get('address')}`;
-    }
+    const btn  = document.getElementById('btn');
+    const addr = document.getElementById('addr');
 
-    // Build the intent that Phantom understands
-    function buildIntent() {
-      const callbackUrl = encodeURIComponent(location.href.split('#')[0]);
-      return `intent://authorize/?cluster=mainnet-beta&callback_url=${callbackUrl}#Intent;scheme=solana-wallet;package=app.phantom;end;`;
-    }
-
-    document.getElementById('btn').addEventListener('click', () => {
-      // iOS universal link
-      const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const url = iOS
-        ? `https://phantom.app/ul/authorize/${encodeURIComponent(location.href.split('#')[0])}?cluster=mainnet-beta`
-        : buildIntent();
-
-      location.href = url;
+    btn.addEventListener('click', async () => {
+      try {
+        const pk = await transact(async wallet => {
+          const { accounts } = await wallet.authorize({ cluster: 'mainnet-beta' });
+          return accounts[0].address;
+        });
+        addr.textContent = `Connected: ${pk}`;
+      } catch (e) {
+        addr.textContent = e.message || 'Cancelled';
+      }
     });
+
+    // auto-restore if already authorised
+    try {
+      const pk = await transact(async wallet => {
+        const { accounts } = await wallet.authorize({ onlyIfTrusted: true, cluster: 'mainnet-beta' });
+        return accounts[0]?.address;
+      });
+      if (pk) addr.textContent = `Connected: ${pk}`;
+    } catch {}
   </script>
 </body>
 </html>
