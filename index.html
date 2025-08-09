@@ -2,29 +2,59 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Phantom Mobile Connect</title>
+  <title>Phantom Mobile Wallet Connect</title>
 </head>
 <body>
-  <h2>Phantom Mobile Connect</h2>
+  <h2>Phantom Mobile Wallet Connect (MWA)</h2>
   <button id="connectBtn">Connect Wallet</button>
   <p id="status">Not connected</p>
 
-  <script>
-    const status = document.getElementById("status");
-    const btn = document.getElementById("connectBtn");
+  <script type="module">
+    import { transact } from 'https://cdn.jsdelivr.net/npm/@solana-mobile/mobile-wallet-adapter-protocol@1.0.3/dist/index.browser.esm.js';
 
-    // 1. On page load, check if Phantom returned with address in URL
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("wallet")) {
-      status.textContent = "Connected: " + params.get("wallet");
+    const status = document.getElementById("status");
+    const connectBtn = document.getElementById("connectBtn");
+
+    // Restore last session if already authorized
+    async function restoreSession() {
+      try {
+        const address = await transact(async (wallet) => {
+          const accounts = await wallet.getAccounts();
+          if (accounts.length > 0) {
+            return accounts[0].address;
+          }
+          return null;
+        });
+        if (address) {
+          status.textContent = "Connected: " + address;
+        }
+      } catch (err) {
+        console.log("No previous session found.");
+      }
     }
 
-    // 2. On click, open Phantom deep link
-    btn.addEventListener("click", () => {
-      const mySite = encodeURIComponent(window.location.origin + window.location.pathname);
-      // This is a mock — in real MWA, you'd do encryption, but for demo:
-      window.location.href = `https://phantom.app/ul/v1/connect?app_url=${mySite}&redirect_link=${mySite}&cluster=mainnet-beta`;
+    connectBtn.addEventListener("click", async () => {
+      try {
+        const address = await transact(async (wallet) => {
+          const auth = await wallet.authorize({
+            cluster: 'solana:mainnet-beta',
+            identity: {
+              name: 'My Mobile dApp',
+              uri: window.location.origin
+            }
+          });
+          return auth.accounts[0].address;
+        });
+
+        status.textContent = "Connected: " + address;
+      } catch (err) {
+        console.error("Connection error:", err);
+        status.textContent = "Connection failed or cancelled";
+      }
     });
+
+    // Try restoring connection on load
+    restoreSession();
   </script>
 </body>
 </html>
