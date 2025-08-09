@@ -1,60 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Phantom Mobile Wallet Connect</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Connect Phantom (in-app browser)</title>
+  <style>
+    html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}
+    button{background:#9945ff;color:#fff;border:none;padding:14px 28px;font-size:1.2rem;border-radius:8px;cursor:pointer}
+    #addr{margin-top:20px;font-size:1rem;color:#00ffa3;word-break:break-all}
+  </style>
 </head>
 <body>
-  <h2>Phantom Mobile Wallet Connect (MWA)</h2>
-  <button id="connectBtn">Connect Wallet</button>
-  <p id="status">Not connected</p>
+  <button id="btn">Connect Wallet</button>
+  <div id="addr"></div>
 
   <script type="module">
-    import { transact } from 'https://cdn.jsdelivr.net/npm/@solana-mobile/mobile-wallet-adapter-protocol@1.0.3/dist/index.browser.esm.js';
+    // 1. official Mobile-Wallet-Adapter bundle
+    import { transact } from 'https://unpkg.com/@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.0/dist/index.browser.esm.js';
 
-    const status = document.getElementById("status");
-    const connectBtn = document.getElementById("connectBtn");
+    const btn  = document.getElementById('btn');
+    const addr = document.getElementById('addr');
 
-    // Restore last session if already authorized
-    async function restoreSession() {
+    btn.addEventListener('click', async () => {
       try {
-        const address = await transact(async (wallet) => {
-          const accounts = await wallet.getAccounts();
-          if (accounts.length > 0) {
-            return accounts[0].address;
-          }
-          return null;
-        });
-        if (address) {
-          status.textContent = "Connected: " + address;
-        }
-      } catch (err) {
-        console.log("No previous session found.");
-      }
-    }
-
-    connectBtn.addEventListener("click", async () => {
-      try {
-        const address = await transact(async (wallet) => {
-          const auth = await wallet.authorize({
-            cluster: 'solana:mainnet-beta',
-            identity: {
-              name: 'My Mobile dApp',
-              uri: window.location.origin
-            }
+        const pubkey = await transact(async wallet => {
+          // this fires the native Phantom prompt
+          const { accounts } = await wallet.authorize({
+            cluster: 'mainnet-beta',
+            identity: { name: 'Demo dApp' }
           });
-          return auth.accounts[0].address;
+          return accounts[0].address;
         });
-
-        status.textContent = "Connected: " + address;
-      } catch (err) {
-        console.error("Connection error:", err);
-        status.textContent = "Connection failed or cancelled";
+        addr.textContent = `Connected: ${pubkey}`;
+      } catch (e) {
+        addr.textContent = e.message || 'Cancelled';
       }
     });
 
-    // Try restoring connection on load
-    restoreSession();
+    // auto-restore if already authorised
+    try {
+      const pk = await transact(async wallet => {
+        const { accounts } = await wallet.authorize({ onlyIfTrusted: true, cluster: 'mainnet-beta' });
+        return accounts[0]?.address;
+      });
+      if (pk) addr.textContent = `Connected: ${pk}`;
+    } catch {}
   </script>
 </body>
 </html>
