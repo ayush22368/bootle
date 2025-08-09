@@ -3,43 +3,68 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Connect Phantom (Custom-Tab)</title>
+  <title>Phantom – Custom-Tab flow</title>
   <style>
     html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-    button{background:#9945ff;color:#fff;border:none;padding:16px 32px;font-size:1.2rem;border-radius:8px;cursor:pointer;margin-bottom:24px}
+    #cta{background:#9945ff;color:#fff;border:none;padding:16px 32px;font-size:1.2rem;border-radius:8px;cursor:pointer;margin-bottom:24px}
+    #connectBtn{background:#00ffa3;color:#000;border:none;padding:14px 28px;font-size:1.1rem;border-radius:8px;display:none}
     #addr{margin-top:20px;font-size:1rem;color:#00ffa3;word-break:break-all}
   </style>
 </head>
 <body>
-  <button id="btn">Connect Wallet</button>
+  <!-- STEP 1: open inside Custom-Tab -->
+  <button id="cta">Open in Phantom</button>
+
+  <!-- STEP 2: real wallet button once inside Custom-Tab -->
+  <button id="connectBtn">Connect Wallet</button>
   <div id="addr"></div>
 
   <script type="module">
-    /* ---------- detect environment ---------- */
-    const inCustomTab = /wv|Mobile.*Chrome/i.test(navigator.userAgent) && !/Phantom/i.test(navigator.userAgent);
+    /* ---------- Detect if we are inside a Custom-Tab ---------- */
+    const ua = navigator.userAgent || '';
+    const inCT = /wv|Mobile.*Chrome/i.test(ua);
 
-    /* ---------- build deep-link for Custom-Tab ---------- */
-    const url = new URL(location.href);
-    url.searchParams.set('from', 'cta');        // small flag so we know we’re back
-    const callback = encodeURIComponent(url.toString());
+    const ctaBtn   = document.getElementById('cta');
+    const connBtn  = document.getElementById('connectBtn');
+    const addrEl   = document.getElementById('addr');
 
-    const androidIntent =
-      `intent://authorize/` +
-      `?cluster=mainnet-beta` +
-      `&callback_url=${callback}` +
-      `#Intent;scheme=solana-wallet;package=app.phantom;S.browser_fallback_url=${encodeURIComponent(location.href)};end;`;
+    /* ---------- STEP 1: external browser → launch Custom-Tab ---------- */
+    if (!inCT) {
+      const url = new URL(location.href);
+      url.searchParams.set('ct', '1'); // flag so we know we’re back
+      const callback = encodeURIComponent(url.toString());
 
-    const iosUniversal = `https://phantom.app/ul/authorize/${callback}?cluster=mainnet-beta`;
+      const androidIntent =
+        `intent://authorize/` +
+        `?cluster=mainnet-beta` +
+        `&callback_url=${callback}` +
+        `#Intent;scheme=solana-wallet;package=app.phantom;S.browser_fallback_url=${encodeURIComponent(location.href)};end;`;
 
-    document.getElementById('btn').addEventListener('click', () => {
-      const link = /iPhone|iPad|iPod/.test(navigator.userAgent) ? iosUniversal : androidIntent;
-      location.href = link;
-    });
+      const iosUniversal = `https://phantom.app/ul/authorize/${callback}?cluster=mainnet-beta`;
 
-    /* ---------- on return, read the address ---------- */
-    const params = new URLSearchParams(location.hash.slice(1));
-    if (params.get('address')) {
-      document.getElementById('addr').textContent = `Connected: ${params.get('address')}`;
+      ctaBtn.onclick = () => {
+        location.href = /iPhone|iPad|iPod/.test(ua) ? iosUniversal : androidIntent;
+      };
+    } else {
+      /* ---------- STEP 2: inside Custom-Tab → show real button ---------- */
+      ctaBtn.style.display = 'none';
+      connBtn.style.display = 'inline-block';
+
+      /* import adapter */
+      import('https://unpkg.com/@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.0/dist/index.browser.esm.js')
+        .then(({ transact }) => {
+          connBtn.onclick = async () => {
+            try {
+              const pk = await transact(async wallet => {
+                const { accounts } = await wallet.authorize({ cluster: 'mainnet-beta' });
+                return accounts[0].address;
+              });
+              addrEl.textContent = `Connected: ${pk}`;
+            } catch (e) {
+              addrEl.textContent = e.message || 'Cancelled';
+            }
+          };
+        });
     }
   </script>
 </body>
