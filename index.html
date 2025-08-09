@@ -3,64 +3,43 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Open in Phantom</title>
+  <title>Connect Phantom (Custom-Tab)</title>
   <style>
-    html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}
-    #openBtn{background:#9945ff;color:#fff;border:none;padding:16px 32px;font-size:1.2rem;border-radius:8px;cursor:pointer;margin-bottom:24px}
-    #connectBtn{background:#00ffa3;color:#000;border:none;padding:14px 28px;font-size:1.1rem;border-radius:8px;display:none}
+    html,body{margin:0;height:100%;background:#0e0e0e;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+    button{background:#9945ff;color:#fff;border:none;padding:16px 32px;font-size:1.2rem;border-radius:8px;cursor:pointer;margin-bottom:24px}
     #addr{margin-top:20px;font-size:1rem;color:#00ffa3;word-break:break-all}
   </style>
 </head>
 <body>
-  <div id="wrapper">
-    <button id="openBtn">Open in Phantom</button>
-    <button id="connectBtn">Connect Wallet</button>
-    <div id="addr"></div>
-  </div>
+  <button id="btn">Connect Wallet</button>
+  <div id="addr"></div>
 
   <script type="module">
-    /* ---------- helpers ---------- */
-    const ua = navigator.userAgent || '';
-    const inPhantom = /Phantom/i.test(ua) && /Mobile/i.test(ua);
+    /* ---------- detect environment ---------- */
+    const inCustomTab = /wv|Mobile.*Chrome/i.test(navigator.userAgent) && !/Phantom/i.test(navigator.userAgent);
 
-    const openBtn   = document.getElementById('openBtn');
-    const connectBtn= document.getElementById('connectBtn');
-    const addr      = document.getElementById('addr');
+    /* ---------- build deep-link for Custom-Tab ---------- */
+    const url = new URL(location.href);
+    url.searchParams.set('from', 'cta');        // small flag so we know we’re back
+    const callback = encodeURIComponent(url.toString());
 
-    /* 1. not inside Phantom → show “Open in Phantom” button */
-    if (!inPhantom) {
-      const intent = `intent://${location.host}${location.pathname}#Intent;scheme=https;package=app.phantom;end;`;
-      const iosUrl = `https://phantom.app/ul/browser/${encodeURIComponent(location.href)}`;
+    const androidIntent =
+      `intent://authorize/` +
+      `?cluster=mainnet-beta` +
+      `&callback_url=${callback}` +
+      `#Intent;scheme=solana-wallet;package=app.phantom;S.browser_fallback_url=${encodeURIComponent(location.href)};end;`;
 
-      openBtn.style.display = 'inline-block';
-      openBtn.onclick = () => {
-        location.href = /iPhone|iPad|iPod/.test(ua) ? iosUrl : intent;
-      };
-    } else {
-      /* 2. we are inside Phantom → show the real wallet button */
-      openBtn.style.display = 'none';
-      connectBtn.style.display = 'inline-block';
+    const iosUniversal = `https://phantom.app/ul/authorize/${callback}?cluster=mainnet-beta`;
 
-      import('https://unpkg.com/@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.0/dist/index.browser.esm.js')
-        .then(({ transact }) => {
-          connectBtn.onclick = async () => {
-            try {
-              const pk = await transact(async wallet => {
-                const { accounts } = await wallet.authorize({ cluster: 'mainnet-beta' });
-                return accounts[0].address;
-              });
-              addr.textContent = `Connected: ${pk}`;
-            } catch (e) {
-              addr.textContent = e.message || 'Cancelled';
-            }
-          };
+    document.getElementById('btn').addEventListener('click', () => {
+      const link = /iPhone|iPad|iPod/.test(navigator.userAgent) ? iosUniversal : androidIntent;
+      location.href = link;
+    });
 
-          // auto-restore
-          transact(async wallet => {
-            const { accounts } = await wallet.authorize({ onlyIfTrusted: true, cluster: 'mainnet-beta' });
-            if (accounts[0]) addr.textContent = `Connected: ${accounts[0].address}`;
-          }).catch(()=>{});
-        });
+    /* ---------- on return, read the address ---------- */
+    const params = new URLSearchParams(location.hash.slice(1));
+    if (params.get('address')) {
+      document.getElementById('addr').textContent = `Connected: ${params.get('address')}`;
     }
   </script>
 </body>
